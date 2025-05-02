@@ -1,0 +1,56 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Initial Space API Configuration",
+        "data": {
+          "space": "[%key:common::config_flow::data::name%]",
+          "logo": "Logo URL",
+          "url": "Website URL"
+        },
+        "data_description": {
+          "space": "The name of your Space.",
+          "logo": "The URL to your Space's Logo",
+          "url": "The URL to your Space's website"
+        }
+      },
+      "contact": {
+        "title": "Contact Information for your Space",
+        "data": {
+          "phone": "Phone Number",
+          "sip": "SIP URI",
+          "irc": "IRC URL",
+          "twitter": "Twitter Username",
+          "mastodon": "Mastodon username",
+          "facebook": "Facebook account URL",
+          "identica": "Identica account",
+          "foursquare": "Foursquare ID",
+          "email": "[%key:common::config_flow::data::email%]",
+          "ml": "[%key:common::config_flow::data::email%]",
+          "xmpp": "Jabber/XMPP chatroom",
+          "issue_mail": "[%key:common::config_flow::data::email%]",
+          "gopher": "Gopherspace URL",
+          "matrix": "Matrix channel/community",
+          "mumble": "Mumble URL"
+        },
+        "data_description": {
+          "phone": "The phone number for your Space, including country code with a leading plus sign.",
+          "sip": "URI for your Space's Voice-over-IP via SIP",
+          "irc": "URL of the IRC channel for your Space",
+          "twitter": "Twitter username with leading '@' for your Space",
+          "mastodon": "Mastodon username for your Space",
+          "facebook": "Facebook account URL for your Space",
+          "identica": "Identi.ca or StatusNet account",
+          "foursquare": "Foursquare ID for your Space",
+          "email": "E-mail address for contacting your Space",
+          "ml": "The e-mail address of your Space's mailing list",
+          "xmpp": "Jabber/XMPP multi-user chatroom for your Space",
+          "issue_mail": "A separate email address for issue reports",
+          "gopher": "Gopherspace URL to find information about your Space",
+          "matrix": "Matrix channel/community for the Hackerspace",
+          "mumble": "URL to a Mumble server/channel"
+        }
+      }
+    }
+  }
+}
