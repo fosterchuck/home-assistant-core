@@ -250,7 +250,9 @@ def setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up SpaceAPI from ConfigEntry."""
-    hass.data[DATA_SPACEAPI] = entry.data
+    updated_config: dict[str, Any] = dict(entry.data)
+    updated_config.update(entry.options)
+    hass.data[DATA_SPACEAPI] = updated_config
     hass.http.register_view(APISpaceApiView)
     entry.async_on_unload(entry.add_update_listener(async_update_options))
     return True
@@ -318,7 +320,7 @@ class APISpaceApiView(HomeAssistantView):
         except TypeError:
             pass
 
-        state: dict[str, Any]
+        state: dict[str, Any] | None = None
         if spaceapi_config.get(CONF_STATE):
             state_entity = spaceapi_config[CONF_STATE][ATTR_ENTITY_ID]
 
@@ -330,11 +332,11 @@ class APISpaceApiView(HomeAssistantView):
             else:
                 state = {ATTR_OPEN: False, ATTR_LASTCHANGE: 0}
 
-        with suppress(KeyError):
-            state[ATTR_ICON] = {
-                ATTR_OPEN: spaceapi_config[CONF_STATE][CONF_ICON_OPEN],
-                ATTR_CLOSED: spaceapi_config[CONF_STATE][CONF_ICON_CLOSED],
-            }
+            with suppress(KeyError):
+                state[ATTR_ICON] = {
+                    ATTR_OPEN: spaceapi_config[CONF_STATE][CONF_ICON_OPEN],
+                    ATTR_CLOSED: spaceapi_config[CONF_STATE][CONF_ICON_CLOSED],
+                }
 
         # Space API v15 renamed "jabber" to "xmpp"
         # but we need to process the legacy YAML config for now
@@ -351,7 +353,7 @@ class APISpaceApiView(HomeAssistantView):
             ATTR_URL: spaceapi_config[CONF_URL],
         }
 
-        if state:
+        if state is not None:
             data[ATTR_STATE] = state
 
         with suppress(KeyError):

@@ -255,7 +255,7 @@ class SpaceApiConfigFlow(ConfigFlow, domain=DOMAIN):
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
         """Get the options flow for this handler."""
-        return SpaceApiOptionsFlowHandler(config_entry)
+        return SpaceApiOptionsFlowHandler()
 
 
 class SpaceApiOptionsFlowHandler(OptionsFlow):
@@ -263,8 +263,8 @@ class SpaceApiOptionsFlowHandler(OptionsFlow):
 
     staged_config_entry: dict[str, Any]
 
-    def __init__(self, config_entry: ConfigEntry) -> None:
-        """Initialize OptionsFlowHandler for the Space API."""
+    # def __init__(self, config_entry: ConfigEntry) -> None:
+    #     """Initialize OptionsFlowHandler for the Space API."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -272,6 +272,7 @@ class SpaceApiOptionsFlowHandler(OptionsFlow):
         """Manage the options for the Space API."""
         self.staged_config_entry = dict(self.config_entry.options)
         if user_input is not None:
+            # Abort config flow
             pass
         return self.async_show_menu(
             step_id="init",
@@ -290,7 +291,7 @@ class SpaceApiOptionsFlowHandler(OptionsFlow):
             if self.staged_config_entry.get(CONF_SENSORS) is None:
                 self.staged_config_entry[CONF_SENSORS] = {}
             self.staged_config_entry[CONF_SENSORS][CONF_TEMPERATURE] = user_input.get(
-                "user_input_temperature"
+                CONF_TEMPERATURE
             )
             # if self.hass.config_entries.async_update_entry(
             #     entry=self.config_entry, title=DOMAIN, data=self.staged_config_entry
@@ -301,7 +302,7 @@ class SpaceApiOptionsFlowHandler(OptionsFlow):
             return self.async_create_entry(title=DOMAIN, data=self.staged_config_entry)
         TEMP_SENSOR_SCHEMA = vol.Schema(
             {
-                vol.Required("user_input_temperature"): EntitySelector(
+                vol.Required(CONF_TEMPERATURE): EntitySelector(
                     EntitySelectorConfig(
                         multiple=True,
                         filter=EntityFilterSelectorConfig(
