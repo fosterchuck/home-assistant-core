@@ -7,7 +7,7 @@ from typing import Any
 from aiohttp import web
 import voluptuous as vol
 
-from homeassistant import core as ha
+from homeassistant import config_entries, core as ha
 from homeassistant.components.http import KEY_HASS, HomeAssistantView
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
@@ -30,7 +30,17 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.util import dt as dt_util
 
-from .const import CONF_CONTACT, CONF_HUMIDITY, CONF_TEMPERATURE, DOMAIN
+from .const import (
+    CONF_CAM,
+    CONF_CONTACT,
+    CONF_FEEDS,
+    CONF_HUMIDITY,
+    CONF_PROJECTS,
+    CONF_SPACEFED,
+    CONF_TEMPERATURE,
+    DOMAIN,
+    LOGGER,
+)
 
 ATTR_ADDRESS = "address"
 ATTR_SPACEFED = "spacefed"
@@ -63,16 +73,15 @@ CONF_ICON_OPEN = "icon_open"
 CONF_ICONS = "icons"
 CONF_IRC = "irc"
 CONF_ISSUE_REPORT_CHANNELS = "issue_report_channels"
-CONF_SPACEFED = "spacefed"
+
 CONF_SPACENET = "spacenet"
 CONF_SPACESAML = "spacesaml"
 CONF_SPACEPHONE = "spacephone"
-CONF_CAM = "cam"
 CONF_STREAM = "stream"
 CONF_M4 = "m4"
 CONF_MJPEG = "mjpeg"
 CONF_USTREAM = "ustream"
-CONF_FEEDS = "feeds"
+
 CONF_FEED_BLOG = "blog"
 CONF_FEED_WIKI = "wiki"
 CONF_FEED_CALENDAR = "calendar"
@@ -81,7 +90,7 @@ CONF_FEED_TYPE = "type"
 CONF_FEED_URL = "url"
 CONF_CACHE = "cache"
 CONF_CACHE_SCHEDULE = "schedule"
-CONF_PROJECTS = "projects"
+
 CONF_RADIO_SHOW = "radio_show"
 CONF_RADIO_SHOW_NAME = "name"
 CONF_RADIO_SHOW_URL = "url"
@@ -240,11 +249,19 @@ CONFIG_SCHEMA = vol.Schema(
 )
 
 
-def setup(hass: HomeAssistant, config: ConfigType) -> bool:
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Register the SpaceAPI with the HTTP interface."""
     # hass.data[DATA_SPACEAPI] = config[DOMAIN]
     # hass.http.register_view(APISpaceApiView)
+    LOGGER.info("Got to async_setup")
+    if (conf := config.get(DOMAIN)) is None:
+        return True
 
+    hass.async_create_task(
+        hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_IMPORT}, data=conf
+        )
+    )
     return True
 
 

@@ -51,6 +51,9 @@
           "mumble": "URL to a Mumble server/channel"
         }
       }
+    },
+    "abort": {
+      "required_keys_absent": "The configuration keys required by the SpaceAPI are not present"
     }
   }
 }

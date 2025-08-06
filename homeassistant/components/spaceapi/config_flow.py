@@ -1,5 +1,6 @@
 """Config flow for Space API integration."""
 
+from copy import deepcopy
 from typing import Any, Final
 
 import voluptuous as vol
@@ -12,7 +13,7 @@ from homeassistant.config_entries import (
     ConfigFlowResult,
     OptionsFlow,
 )
-from homeassistant.const import CONF_SENSORS
+from homeassistant.const import CONF_LOCATION, CONF_SENSORS, CONF_STATE
 from homeassistant.core import callback
 from homeassistant.exceptions import ConfigEntryError
 from homeassistant.helpers.selector import (
@@ -24,7 +25,17 @@ from homeassistant.helpers.selector import (
     TextSelectorType,
 )
 
-from .const import CONF_CONTACT, CONF_HUMIDITY, CONF_TEMPERATURE, DOMAIN
+from .const import (
+    CONF_CAM,
+    CONF_CONTACT,
+    CONF_FEEDS,
+    CONF_HUMIDITY,
+    CONF_PROJECTS,
+    CONF_SPACEFED,
+    CONF_TEMPERATURE,
+    DOMAIN,
+    LOGGER,
+)
 
 # Labels for the ConfigEntry
 CONF_SPACE_NAME: Final[str] = "space"
@@ -156,8 +167,12 @@ class SpaceApiConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Space API."""
 
     VERSION: int = 1
-    staged_config_entry: dict[str, Any]
     _existing_entry_data: ConfigEntry
+
+    def __init__(self) -> None:
+        """Initialize class variables."""
+        self.staged_data: dict[str, Any] = {}
+        self.staged_options: dict[str, Any] = {}
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -165,7 +180,7 @@ class SpaceApiConfigFlow(ConfigFlow, domain=DOMAIN):
         """Handle a config flow initialized by the user."""
         errors: dict[str, str] = {}
         if user_input is not None:
-            self.staged_config_entry = user_input
+            self.staged_data = user_input
             if not errors:
                 return await self.async_step_contact()
             raise ConfigEntryError
@@ -195,14 +210,14 @@ class SpaceApiConfigFlow(ConfigFlow, domain=DOMAIN):
         """Second page of the initial config to get contact info."""
         errors: dict[str, str] = {}
         if user_input is not None:
-            self.staged_config_entry[CONF_CONTACT] = user_input
+            self.staged_data[CONF_CONTACT] = user_input
             if self.source == SOURCE_RECONFIGURE:
                 return self.async_update_reload_and_abort(
                     entry=self._existing_entry_data,
                     title=DOMAIN,
-                    data=self.staged_config_entry,
+                    data=self.staged_data,
                 )
-            return self.async_create_entry(title=DOMAIN, data=self.staged_config_entry)
+            return self.async_create_entry(title=DOMAIN, data=self.staged_data)
         if self.source == SOURCE_RECONFIGURE:
             suggested_values: dict[str, str] = self._existing_entry_data.data[
                 CONF_CONTACT
@@ -231,25 +246,52 @@ class SpaceApiConfigFlow(ConfigFlow, domain=DOMAIN):
         self._existing_entry_data: ConfigEntry = self._get_reconfigure_entry()
         return await self.async_step_user()
 
-    # async def async_step_import(self, import_data: dict[str, Any]) -> ConfigFlowResult:
-    #     """Import legacy config from configuration.yaml."""
-    #     # Import the required fields into data
-    #     # Import the options into options
+    async def async_step_import(self, import_data: dict[str, Any]) -> ConfigFlowResult:
+        """Import legacy config from configuration.yaml."""
+        # Import the required fields into data
+        LOGGER.info("Got to Import function")
+        required_config_roots: list[str] = [
+            CONF_SPACE_NAME,
+            CONF_LOGO_URL,
+            CONF_SPACE_URL,
+            CONF_CONTACT,
+        ]
+        if set(required_config_roots).issubset(import_data):
+            for root in required_config_roots:
+                self.staged_data[root] = deepcopy(import_data[root])
+        else:
+            return self.async_abort(reason="required_keys_absent")
+        # Import the optional fields that were part of the original YAML spec into options
+        optional_config_roots: list[str] = [
+            CONF_CAM,
+            CONF_FEEDS,
+            CONF_LOCATION,
+            CONF_PROJECTS,
+            CONF_SENSORS,
+            CONF_SPACEFED,
+            CONF_STATE,
+        ]
+        for root, value in import_data.items():
+            if root in optional_config_roots:
+                self.staged_options[root] = value
+        return self.async_create_entry(
+            title=DOMAIN, data=self.staged_data, options=self.staged_options
+        )
 
-    #     async_create_issue(
-    #         hass=self.hass,
-    #         domain=DOMAIN,
-    #         issue_id=f"deprecated_yaml_{DOMAIN}",
-    #         is_fixable=False,
-    #         is_persistent=False,
-    #         issue_domain=DOMAIN,
-    #         severity=IssueSeverity.WARNING,
-    #         translation_key="deprecated_yaml_import_issue",
-    #         translation_placeholders={
-    #             "domain": DOMAIN,
-    #             "integration_title": INTEGRATION_TITLE,
-    #         },
-    #     )
+        # async_create_issue(
+        #     hass=self.hass,
+        #     domain=DOMAIN,
+        #     issue_id=f"deprecated_yaml_{DOMAIN}",
+        #     is_fixable=False,
+        #     is_persistent=False,
+        #     issue_domain=DOMAIN,
+        #     severity=IssueSeverity.WARNING,
+        #     translation_key="deprecated_yaml_import_issue",
+        #     translation_placeholders={
+        #         "domain": DOMAIN,
+        #         "integration_title": INTEGRATION_TITLE,
+        #     },
+        # )
 
     @staticmethod
     @callback
@@ -261,19 +303,28 @@ class SpaceApiConfigFlow(ConfigFlow, domain=DOMAIN):
 class SpaceApiOptionsFlowHandler(OptionsFlow):
     """Handles options flow for the Space API."""
 
-    staged_config_entry: dict[str, Any]
+    staged_options: dict[str, Any]
 
-    # def __init__(self, config_entry: ConfigEntry) -> None:
-    #     """Initialize OptionsFlowHandler for the Space API."""
+    def _cleanup_empty_options(self) -> None:
+        """Make sure each key isn't just an empty object."""
+        # Cleanup empty sensor lists
+        all_sensors = self.staged_options.get(CONF_SENSORS)
+        if all_sensors:
+            for sensor_type in list(all_sensors):
+                if not all_sensors.get(sensor_type):
+                    self.staged_options[CONF_SENSORS].pop(sensor_type)
+        # Cleanup empty items at the root
+        for key in list(self.staged_options):
+            if not self.staged_options.get(key):
+                self.staged_options.pop(key)
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Manage the options for the Space API."""
-        self.staged_config_entry = dict(self.config_entry.options)
+        self.staged_options = deepcopy(dict(self.config_entry.options))
         if user_input is not None:
-            # Abort config flow
-            pass
+            raise ConfigEntryError
         return self.async_show_menu(
             step_id="init",
             menu_options={
@@ -288,18 +339,13 @@ class SpaceApiOptionsFlowHandler(OptionsFlow):
         """Config Options step to obtain the temperature sensors."""
         errors: dict[str, str] = {}
         if user_input is not None:
-            if self.staged_config_entry.get(CONF_SENSORS) is None:
-                self.staged_config_entry[CONF_SENSORS] = {}
-            self.staged_config_entry[CONF_SENSORS][CONF_TEMPERATURE] = user_input.get(
+            if self.staged_options.get(CONF_SENSORS) is None:
+                self.staged_options[CONF_SENSORS] = {}
+            self.staged_options[CONF_SENSORS][CONF_TEMPERATURE] = user_input.get(
                 CONF_TEMPERATURE
             )
-            # if self.hass.config_entries.async_update_entry(
-            #     entry=self.config_entry, title=DOMAIN, data=self.staged_config_entry
-            # ):
-            #     return ConfigFlowResult()
-            # FlowResultType.CREATE_ENTRY
-            # return FlowResultType.ABORT
-            return self.async_create_entry(title=DOMAIN, data=self.staged_config_entry)
+            self._cleanup_empty_options()
+            return self.async_create_entry(title="", data=self.staged_options)
         TEMP_SENSOR_SCHEMA = vol.Schema(
             {
                 vol.Required(CONF_TEMPERATURE): EntitySelector(
@@ -312,7 +358,7 @@ class SpaceApiOptionsFlowHandler(OptionsFlow):
                 ),
             }
         )
-        existing_sensors: dict[str, list[str]] | None = self.staged_config_entry.get(
+        existing_sensors: dict[str, list[str]] | None = self.staged_options.get(
             CONF_SENSORS
         )
         if existing_sensors and existing_sensors.get(CONF_TEMPERATURE):
@@ -339,12 +385,12 @@ class SpaceApiOptionsFlowHandler(OptionsFlow):
         """Config Options step to obtain the humidity sensors."""
         errors: dict[str, str] = {}
         if user_input is not None:
-            if self.staged_config_entry.get(CONF_SENSORS) is None:
-                self.staged_config_entry[CONF_SENSORS] = {}
-            self.staged_config_entry[CONF_SENSORS][CONF_HUMIDITY] = user_input.get(
+            if self.staged_options.get(CONF_SENSORS) is None:
+                self.staged_options[CONF_SENSORS] = {}
+            self.staged_options[CONF_SENSORS][CONF_HUMIDITY] = user_input.get(
                 "user_input_humidity"
             )
-            return self.async_create_entry(title=DOMAIN, data=self.staged_config_entry)
+            return self.async_create_entry(title="", data=self.staged_options)
         return self.async_show_form(
             step_id="humidity",
             data_schema=vol.Schema(
